@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>La Bodeguita de Angel 🛒</title>
+  <meta name="description" content="Haz tu pedido en La Bodeguita de Angel. Productos frescos, entrega rápida." />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Supabase JS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            brand: {
+              50: '#fff7ed',
+              100: '#ffedd5',
+              200: '#fed7aa',
+              300: '#fdba74',
+              400: '#fb923c',
+              500: '#f97316',
+              600: '#ea580c',
+              700: '#c2410c',
+              800: '#9a3412',
+              900: '#7c2d12',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* ── Scrollbar styling ── */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: #1f2937;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #f97316;
+      border-radius: 3px;
+    }
+
+    /* ── Animations ── */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes slideInRight {
+      from {
+        opacity: 0;
+        transform: translateX(100%);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    @keyframes pulse-ring {
+      0% {
+        box-shadow: 0 0 0 0 rgba(249, 115, 22, 0.6);
+      }
+
+      70% {
+        box-shadow: 0 0 0 12px rgba(249, 115, 22, 0);
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
+      }
+    }
+
+    @keyframes shimmer {
+      0% {
+        background-position: -200% 0;
+      }
+
+      100% {
+        background-position: 200% 0;
+      }
+    }
+
+    @keyframes modalIn {
+      from {
+        opacity: 0;
+        transform: scale(0.92) translateY(30px);
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    .fade-in-up {
+      animation: fadeInUp 0.45s ease both;
+    }
+
+    .slide-right {
+      animation: slideInRight 0.35s ease both;
+    }
+
+    .modal-in {
+      animation: modalIn 0.35s cubic-bezier(.34, 1.56, .64, 1) both;
+    }
+
+    .pulse-btn {
+      animation: pulse-ring 2s infinite;
+    }
+
+    /* Skeleton loader */
+    .skeleton {
+      background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+    }
+
+    /* Glass card */
+    .glass {
+      background: rgba(31, 41, 55, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    /* Quantity input arrows hidden */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
+  </style>
+</head>
+
+<body class="bg-gray-950 text-gray-100 font-sans min-h-screen">
+
+  <!-- ════════════════════════════════════════════
+     TOP NAVBAR
+════════════════════════════════════════════ -->
+  <header class="sticky top-0 z-40 glass border-b border-gray-800 shadow-lg shadow-black/40">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+      <!-- Brand -->
+      <div class="flex items-center gap-3 min-w-0">
+        <div
+          class="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center shadow-lg flex-shrink-0">
+          <span class="text-xl">🛒</span>
+        </div>
+        <div class="min-w-0">
+          <h1 class="text-lg font-bold leading-tight truncate">La Bodeguita de Angel</h1>
+          <p class="text-xs text-gray-400 leading-tight hidden sm:block">Pide fresco, recibe rápido</p>
+        </div>
+      </div>
+
+      <!-- Cart button -->
+      <button id="btn-open-cart" onclick="openCartModal()" class="relative flex items-center gap-2 bg-brand-600 hover:bg-brand-500 transition-all duration-200
+                   px-4 py-2 rounded-xl font-semibold text-sm shadow-lg shadow-brand-900/50 flex-shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-1.4 7h12.8M7 13L5.4 5M17 21a1 1 0 100-2 1 1 0 000 2zm-10 0a1 1 0 100-2 1 1 0 000 2z" />
+        </svg>
+        <span class="hidden sm:inline">Carrito</span>
+        <span id="cart-badge" class="absolute -top-2 -right-2 bg-yellow-400 text-gray-900 text-xs font-bold
+                   w-5 h-5 rounded-full flex items-center justify-center hidden">0</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ════════════════════════════════════════════
+     HERO STRIP
+════════════════════════════════════════════ -->
+  <section
+    class="relative overflow-hidden bg-gradient-to-br from-gray-900 via-gray-950 to-brand-950 border-b border-gray-800">
+    <div
+      class="absolute inset-0 opacity-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-brand-500 via-transparent to-transparent pointer-events-none">
+    </div>
+    <div class="max-w-7xl mx-auto px-4 py-8 sm:py-12 relative">
+      <p class="text-brand-400 text-sm font-semibold uppercase tracking-widest mb-2">Bienvenido</p>
+      <h2 class="text-3xl sm:text-4xl font-extrabold mb-2 leading-tight">
+        ¿Qué vas a llevar hoy? 🥑
+      </h2>
+      <p class="text-gray-400 text-sm sm:text-base max-w-xl">
+        Selecciona tus productos, agrégalos al carrito y completa tu pedido en segundos.
+      </p>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════
+     FILTER TABS (clasificaciones)
+════════════════════════════════════════════ -->
+  <section class="max-w-7xl mx-auto px-4 pt-6 pb-2">
+    <div id="filter-tabs" class="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+      <!-- Skeletons mientras carga -->
+      <div id="tabs-skeleton" class="flex gap-2">
+        <div class="skeleton h-9 w-20 rounded-full flex-shrink-0"></div>
+        <div class="skeleton h-9 w-24 rounded-full flex-shrink-0"></div>
+        <div class="skeleton h-9 w-16 rounded-full flex-shrink-0"></div>
+        <div class="skeleton h-9 w-28 rounded-full flex-shrink-0"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════
+     PRODUCT GRID
+════════════════════════════════════════════ -->
+  <main class="max-w-7xl mx-auto px-4 py-6">
+    <!-- Error message -->
+    <div id="error-msg"
+      class="hidden bg-red-900/40 border border-red-700 text-red-300 rounded-xl p-4 mb-6 flex items-center gap-3">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24"
+        stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+          d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+      </svg>
+      <span id="error-text">Error al cargar productos.</span>
+    </div>
+
+    <!-- Skeleton grid -->
+    <div id="products-skeleton" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+      <!-- 8 skeletons -->
+      <div class="skeleton h-52 rounded-2xl"></div>
+      <div class="skeleton h-52 rounded-2xl"></div>
+      <div class="skeleton h-52 rounded-2xl"></div>
+      <div class="skeleton h-52 rounded-2xl"></div>
+      <div class="skeleton h-52 rounded-2xl hidden sm:block"></div>
+      <div class="skeleton h-52 rounded-2xl hidden sm:block"></div>
+      <div class="skeleton h-52 rounded-2xl hidden lg:block"></div>
+      <div class="skeleton h-52 rounded-2xl hidden lg:block"></div>
+    </div>
+
+    <!-- Real product grid -->
+    <div id="products-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 hidden"></div>
+
+    <!-- Empty state -->
+    <div id="empty-state" class="hidden text-center py-20">
+      <div class="text-6xl mb-4">📦</div>
+      <p class="text-gray-400 text-lg font-medium">No hay productos en esta categoría</p>
+      <p class="text-gray-500 text-sm mt-1">Intenta con otra clasificación</p>
+    </div>
+  </main>
+
+  <!-- ════════════════════════════════════════════
+     FLOATING CART SIDEBAR / MODAL (desktop side, mobile full)
+════════════════════════════════════════════ -->
+  <div id="cart-overlay" class="fixed inset-0 bg-black/60 z-50 hidden backdrop-blur-sm" onclick="closeCartModal()">
+  </div>
+
+  <aside id="cart-panel" class="fixed top-0 right-0 h-full w-full sm:w-96 glass border-l border-gray-700
+              z-50 flex flex-col hidden shadow-2xl shadow-black/60">
+    <!-- Header -->
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-700">
+      <h2 class="text-lg font-bold flex items-center gap-2">
+        🛒 Tu carrito
+      </h2>
+      <button onclick="closeCartModal()"
+        class="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 transition flex items-center justify-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    </div>
+
+    <!-- Cart items -->
+    <div id="cart-items" class="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+      <div id="cart-empty" class="text-center py-16 text-gray-500">
+        <div class="text-5xl mb-3">🛒</div>
+        <p class="font-medium">Tu carrito está vacío</p>
+        <p class="text-sm mt-1">Agrega productos para continuar</p>
+      </div>
+    </div>
+
+    <!-- Footer total + checkout -->
+    <div class="border-t border-gray-700 px-5 py-4 space-y-4">
+      <div class="flex justify-between items-center text-lg font-bold">
+        <span>Total</span>
+        <span id="cart-total" class="text-brand-400 text-xl">$0.00</span>
+      </div>
+      <button id="btn-checkout" onclick="openOrderModal()" disabled class="w-full bg-brand-600 hover:bg-brand-500 disabled:opacity-40 disabled:cursor-not-allowed
+                   transition-all duration-200 py-3 rounded-xl font-bold text-base shadow-lg shadow-brand-900/50
+                   flex items-center justify-center gap-2">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        Procesar Pedido
+      </button>
+    </div>
+  </aside>
+
+  <!-- ════════════════════════════════════════════
+     ORDER MODAL  (nombre + teléfono)
+════════════════════════════════════════════ -->
+  <div id="order-overlay"
+    class="fixed inset-0 bg-black/70 z-[60] hidden backdrop-blur-sm flex items-center justify-center p-4">
+    <div id="order-modal"
+      class="glass border border-gray-700 rounded-2xl w-full max-w-md shadow-2xl shadow-black modal-in">
+      <!-- Modal header -->
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-700">
+        <h3 class="text-lg font-bold">📋 Datos del pedido</h3>
+        <button onclick="closeOrderModal()"
+          class="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 transition flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Order summary -->
+      <div class="px-6 pt-4">
+        <p class="text-sm text-gray-400 mb-3 font-medium">Resumen de tu pedido</p>
+        <div id="order-summary"
+          class="bg-gray-900/60 rounded-xl p-3 max-h-40 overflow-y-auto space-y-1 text-sm border border-gray-700 mb-4">
+        </div>
+        <div class="flex justify-between font-bold text-base mb-5">
+          <span>Total del pedido</span>
+          <span id="order-total" class="text-brand-400"></span>
+        </div>
+      </div>
+
+      <!-- Form -->
+      <form id="order-form" onsubmit="submitOrder(event)" class="px-6 pb-6 space-y-4">
+        <!-- Nombre -->
+        <div>
+          <label for="input-nombre" class="block text-sm font-medium text-gray-300 mb-1">
+            👤 Nombre del cliente <span class="text-brand-400">*</span>
+          </label>
+          <input id="input-nombre" type="text" placeholder="Ej: María González" required autocomplete="name" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-sm
+                      focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent
+                      placeholder-gray-500 transition-all duration-200" />
+        </div>
+
+        <!-- Teléfono -->
+        <div>
+          <label for="input-telefono" class="block text-sm font-medium text-gray-300 mb-1">
+            📱 Número de teléfono <span class="text-brand-400">*</span>
+          </label>
+          <input id="input-telefono" type="tel" placeholder="Ej: 0414-1234567" required autocomplete="tel" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-sm
+                      focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent
+                      placeholder-gray-500 transition-all duration-200" />
+        </div>
+
+        <!-- Error order -->
+        <div id="order-error"
+          class="hidden bg-red-900/40 border border-red-700 text-red-300 rounded-xl px-4 py-3 text-sm">
+        </div>
+
+        <!-- Submit -->
+        <button id="btn-submit-order" type="submit" class="w-full bg-gradient-to-r from-brand-600 to-brand-500 hover:from-brand-500 hover:to-brand-400
+                     transition-all duration-200 py-3 rounded-xl font-bold text-base shadow-lg shadow-brand-900/50
+                     flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+          <svg id="submit-spinner" xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 hidden animate-spin" fill="none"
+            viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+          </svg>
+          <span id="submit-text">✅ Confirmar Pedido</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+     SUCCESS MODAL
+════════════════════════════════════════════ -->
+  <div id="success-overlay"
+    class="fixed inset-0 bg-black/70 z-[70] hidden backdrop-blur-sm flex items-center justify-center p-4">
+    <div
+      class="glass border border-gray-700 rounded-2xl w-full max-w-sm shadow-2xl shadow-black modal-in text-center px-8 py-10">
+      <div class="text-6xl mb-4 animate-bounce">🎉</div>
+      <h3 class="text-2xl font-extrabold mb-2">¡Pedido enviado!</h3>
+      <p class="text-gray-400 text-sm mb-6">Tu pedido fue registrado exitosamente. Pronto nos comunicaremos contigo.</p>
+      <div id="success-detail"
+        class="bg-gray-900/60 rounded-xl p-4 text-left text-sm border border-gray-700 mb-6 space-y-1"></div>
+      <button onclick="closeSuccessModal()"
+        class="w-full bg-brand-600 hover:bg-brand-500 transition py-3 rounded-xl font-bold">
+        Hacer otro pedido
+      </button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════
+     TOAST NOTIFICATION
+════════════════════════════════════════════ -->
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] hidden
+            bg-gray-800 border border-gray-600 text-white text-sm font-medium
+            px-5 py-3 rounded-full shadow-2xl shadow-black/60 slide-right
+            flex items-center gap-2 max-w-xs whitespace-nowrap">
+  </div>
+
+  <!-- ════════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════ -->
+  <script>
+    // ── Configuration ──────────────────────────────────────────────────────────
+    // Reemplaza estos valores con los de tu archivo .env
+    // (En producción, considera un backend o Supabase Edge Functions para proteger la key)
+    const SUPABASE_URL = 'https://nbgyjufksirecalvohww.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_GBDUtKvY8--VEUbDWsSxgA_0XFqj49M';
+
+    // ── Supabase client ────────────────────────────────────────────────────────
+    const { createClient } = supabase;
+    const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ── State ──────────────────────────────────────────────────────────────────
+    let allProducts = [];
+    let classifications = [];
+    let activeClsId = null;   // null = Todos
+    let cart = [];     // [{ product, cantidad }]
+
+    // ── Bootstrap ──────────────────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', async () => {
+      await Promise.all([loadClassifications(), loadProducts()]);
+    });
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // DATA LOADING
+    // ══════════════════════════════════════════════════════════════════════════
+    async function loadClassifications() {
+      const { data, error } = await db
+        .from('clasificacion_articulos')
+        .select('id_clasificacion, nombre')
+        .order('nombre');
+
+      if (error) { console.error('Error cargando clasificaciones:', error); return; }
+      classifications = data || [];
+      renderTabs();
+    }
+
+    async function loadProducts() {
+      showProductSkeleton(true);
+
+      let query = db
+        .from('articulo')
+        .select(`
+      id_art,
+      nombre,
+      precio,
+      stock,
+      permite_decimales,
+      inf,
+      id_clasificacion,
+      clasificacion_articulos ( nombre )
+    `)
+        .gt('stock', 0)          // solo con stock disponible
+        .order('nombre');
+
+      if (activeClsId !== null) {
+        query = query.eq('id_clasificacion', activeClsId);
+      }
+
+      const { data, error } = await query;
+
+      showProductSkeleton(false);
+
+      if (error) {
+        showError('No se pudieron cargar los productos. Verifica la configuración de Supabase.');
+        return;
+      }
+
+      allProducts = data || [];
+      renderProducts(allProducts);
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // RENDER HELPERS
+    // ══════════════════════════════════════════════════════════════════════════
+    function renderTabs() {
+      const container = document.getElementById('filter-tabs');
+      const skeleton = document.getElementById('tabs-skeleton');
+      if (skeleton) skeleton.remove();
+
+      // "Todos" pill
+      const tabs = [{ id: null, nombre: '🏪 Todos' }, ...classifications];
+
+      tabs.forEach((cls, idx) => {
+        const btn = document.createElement('button');
+        btn.dataset.id = cls.id_clasificacion ?? 'all';
+        btn.textContent = cls.nombre;
+        btn.className = buildTabClass(cls.id_clasificacion ?? 'all');
+        btn.style.animationDelay = `${idx * 60}ms`;
+        btn.classList.add('fade-in-up');
+        btn.addEventListener('click', () => {
+          activeClsId = cls.id_clasificacion === undefined ? null : (cls.id_clasificacion ?? null);
+          updateActiveTab(btn.dataset.id);
+          loadProducts();
+        });
+        container.appendChild(btn);
+      });
+    }
+
+    function buildTabClass(id) {
+      const isActive = (id === 'all' && activeClsId === null) || id === activeClsId;
+      return [
+        'flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200',
+        isActive
+          ? 'bg-brand-600 text-white shadow-lg shadow-brand-900/50'
+          : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+      ].join(' ');
+    }
+
+    function updateActiveTab(activeId) {
+      document.querySelectorAll('#filter-tabs button').forEach(btn => {
+        const id = btn.dataset.id;
+        const isActive = id === String(activeId);
+        btn.className = [
+          'flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200',
+          isActive
+            ? 'bg-brand-600 text-white shadow-lg shadow-brand-900/50'
+            : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+        ].join(' ');
+      });
+    }
+
+    function renderProducts(products) {
+      const grid = document.getElementById('products-grid');
+      const empty = document.getElementById('empty-state');
+
+      grid.innerHTML = '';
+
+      if (!products.length) {
+        grid.classList.add('hidden');
+        empty.classList.remove('hidden');
+        return;
+      }
+
+      empty.classList.add('hidden');
+      grid.classList.remove('hidden');
+
+      products.forEach((p, idx) => {
+        const card = buildProductCard(p, idx);
+        grid.appendChild(card);
+      });
+    }
+
+    function buildProductCard(p, idx) {
+      const inCart = cart.find(c => c.product.id_art === p.id_art);
+      const cartQty = inCart ? inCart.cantidad : 0;
+      const step = p.permite_decimales ? 0.5 : 1;
+      const priceStr = formatPrice(p.precio);
+
+      const card = document.createElement('article');
+      card.id = `card-${p.id_art}`;
+      card.className = 'glass rounded-2xl overflow-hidden flex flex-col group hover:border-brand-600/40 transition-all duration-300 fade-in-up';
+      card.style.animationDelay = `${idx * 50}ms`;
+
+      card.innerHTML = `
+    <!-- Color accent top bar -->
+    <div class="h-1.5 bg-gradient-to-r from-brand-500 to-brand-700"></div>
+
+    <div class="p-4 flex flex-col flex-1 gap-3">
+      <!-- Category badge -->
+      <span class="self-start text-xs font-semibold text-brand-400 bg-brand-950/60 border border-brand-800/40 px-2 py-0.5 rounded-full leading-tight">
+        ${p.clasificacion_articulos?.nombre ?? 'Sin categoría'}
+      </span>
+
+      <!-- Name & info -->
+      <div class="flex-1">
+        <h3 class="font-bold text-base leading-snug line-clamp-2 group-hover:text-brand-300 transition-colors">
+          ${escHtml(p.nombre)}
+        </h3>
+        ${p.inf ? `<p class="text-xs text-gray-500 mt-1 line-clamp-2">${escHtml(p.inf)}</p>` : ''}
+      </div>
+
+      <!-- Price -->
+      <div class="flex items-baseline gap-1">
+        <span class="text-xl font-extrabold text-white">${priceStr}</span>
+        <span class="text-xs text-gray-500">${p.permite_decimales ? '/ unidad' : '/ unidad'}</span>
+      </div>
+
+      <!-- Quantity + Add to cart -->
+      <div class="flex items-center gap-2 mt-auto">
+        <!-- Qty stepper -->
+        <div class="flex items-center bg-gray-900 rounded-xl border border-gray-700 overflow-hidden flex-shrink-0">
+          <button type="button"
+                  onclick="changeQty('${p.id_art}', -${step}, ${step})"
+                  class="w-8 h-9 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 transition text-lg font-bold leading-none">
+            −
+          </button>
+          <input id="qty-${p.id_art}"
+                 type="number"
+                 value="${cartQty || step}"
+                 min="${step}"
+                 step="${step}"
+                 class="w-10 h-9 bg-transparent text-center text-sm font-semibold focus:outline-none"/>
+          <button type="button"
+                  onclick="changeQty('${p.id_art}', ${step}, ${step})"
+                  class="w-8 h-9 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-700 transition text-lg font-bold leading-none">
+            +
+          </button>
+        </div>
+
+        <!-- Add button -->
+        <button id="add-btn-${p.id_art}"
+                type="button"
+                onclick="addToCart(${p.id_art})"
+                class="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-sm font-bold
+                       transition-all duration-200 shadow-lg
+                       ${cartQty > 0
+          ? 'bg-green-700 hover:bg-green-600 shadow-green-900/40'
+          : 'bg-brand-600 hover:bg-brand-500 shadow-brand-900/50'}">
+          ${cartQty > 0
+          ? '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Agregado'
+          : '+ Agregar'}
+        </button>
+      </div>
+    </div>
+  `;
+
+      return card;
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // CART LOGIC
+    // ══════════════════════════════════════════════════════════════════════════
+    function addToCart(productId) {
+      const product = allProducts.find(p => p.id_art === productId);
+      if (!product) return;
+
+      const qtyInput = document.getElementById(`qty-${productId}`);
+      const cantidad = parseFloat(qtyInput?.value || 1);
+
+      if (isNaN(cantidad) || cantidad <= 0) {
+        showToast('⚠️ Ingresa una cantidad válida', 'warn');
+        return;
+      }
+
+      const existing = cart.find(c => c.product.id_art === productId);
+
+      if (existing) {
+        existing.cantidad = cantidad;
+      } else {
+        cart.push({ product, cantidad });
+      }
+
+      updateCartUI();
+      updateAddButton(productId, true);
+      showToast(`🛒 ${product.nombre} agregado al carrito`);
+    }
+
+    function removeFromCart(productId) {
+      cart = cart.filter(c => c.product.id_art !== productId);
+      updateCartUI();
+      updateAddButton(productId, false);
+    }
+
+    function updateCartItemQty(productId, newQty) {
+      const item = cart.find(c => c.product.id_art === productId);
+      if (!item) return;
+      item.cantidad = newQty;
+      updateCartUI();
+    }
+
+    function changeQty(productId, delta, step) {
+      const input = document.getElementById(`qty-${productId}`);
+      if (!input) return;
+      const current = parseFloat(input.value) || step;
+      const next = Math.max(step, parseFloat((current + delta).toFixed(5)));
+      input.value = next;
+    }
+
+    function updateAddButton(productId, inCart) {
+      const btn = document.getElementById(`add-btn-${productId}`);
+      if (!btn) return;
+      if (inCart) {
+        btn.className = btn.className.replace('bg-brand-600 hover:bg-brand-500 shadow-brand-900/50',
+          'bg-green-700 hover:bg-green-600 shadow-green-900/40');
+        btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Agregado';
+      } else {
+        btn.className = btn.className.replace('bg-green-700 hover:bg-green-600 shadow-green-900/40',
+          'bg-brand-600 hover:bg-brand-500 shadow-brand-900/50');
+        btn.innerHTML = '+ Agregar';
+      }
+    }
+
+    function updateCartUI() {
+      // Badge
+      const badge = document.getElementById('cart-badge');
+      if (cart.length > 0) {
+        badge.textContent = cart.length;
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+
+      // Cart items list
+      const itemsContainer = document.getElementById('cart-items');
+      const cartEmpty = document.getElementById('cart-empty');
+      const checkoutBtn = document.getElementById('btn-checkout');
+
+      if (cart.length === 0) {
+        cartEmpty.classList.remove('hidden');
+        checkoutBtn.disabled = true;
+        document.getElementById('cart-total').textContent = '$0.00';
+        return;
+      }
+
+      cartEmpty.classList.add('hidden');
+      checkoutBtn.disabled = false;
+
+      // Re-render items (keep empty div, replace siblings)
+      // Remove all cart rows except the empty placeholder
+      itemsContainer.querySelectorAll('.cart-row').forEach(el => el.remove());
+
+      let total = 0;
+
+      cart.forEach(({ product: p, cantidad }) => {
+        const subtotal = p.precio * cantidad;
+        total += subtotal;
+
+        const row = document.createElement('div');
+        row.className = 'cart-row glass rounded-xl p-3 flex items-start gap-3 slide-right';
+        row.innerHTML = `
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-semibold leading-snug line-clamp-2">${escHtml(p.nombre)}</p>
+        <p class="text-xs text-gray-400 mt-0.5">${formatPrice(p.precio)} c/u</p>
+        <!-- Inline qty -->
+        <div class="flex items-center gap-1 mt-2">
+          <button type="button"
+                  onclick="cartChangeQty(${p.id_art}, -${p.permite_decimales ? 0.5 : 1})"
+                  class="w-6 h-6 rounded-lg bg-gray-700 hover:bg-gray-600 transition text-sm flex items-center justify-center font-bold">−</button>
+          <span id="cart-qty-${p.id_art}" class="text-sm font-bold w-8 text-center">${cantidad}</span>
+          <button type="button"
+                  onclick="cartChangeQty(${p.id_art}, ${p.permite_decimales ? 0.5 : 1})"
+                  class="w-6 h-6 rounded-lg bg-gray-700 hover:bg-gray-600 transition text-sm flex items-center justify-center font-bold">+</button>
+        </div>
+      </div>
+      <div class="text-right flex-shrink-0">
+        <p class="font-bold text-brand-400">${formatPrice(subtotal)}</p>
+        <button type="button"
+                onclick="removeFromCart(${p.id_art})"
+                class="text-xs text-gray-500 hover:text-red-400 transition mt-1">Quitar</button>
+      </div>
+    `;
+        itemsContainer.appendChild(row);
+      });
+
+      document.getElementById('cart-total').textContent = formatPrice(total);
+    }
+
+    function cartChangeQty(productId, delta) {
+      const item = cart.find(c => c.product.id_art === productId);
+      if (!item) return;
+      const step = item.product.permite_decimales ? 0.5 : 1;
+      item.cantidad = Math.max(step, parseFloat((item.cantidad + delta).toFixed(5)));
+      const span = document.getElementById(`cart-qty-${productId}`);
+      if (span) span.textContent = item.cantidad;
+      updateCartUI();
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // MODAL CONTROLS
+    // ══════════════════════════════════════════════════════════════════════════
+    function openCartModal() {
+      document.getElementById('cart-overlay').classList.remove('hidden');
+      document.getElementById('cart-panel').classList.remove('hidden');
+      document.getElementById('cart-panel').classList.add('slide-right');
+    }
+
+    function closeCartModal() {
+      document.getElementById('cart-overlay').classList.add('hidden');
+      document.getElementById('cart-panel').classList.add('hidden');
+      document.getElementById('cart-panel').classList.remove('slide-right');
+    }
+
+    function openOrderModal() {
+      closeCartModal();
+      // Build summary
+      const summaryDiv = document.getElementById('order-summary');
+      summaryDiv.innerHTML = '';
+      let total = 0;
+
+      cart.forEach(({ product: p, cantidad }) => {
+        const sub = p.precio * cantidad;
+        total += sub;
+        const row = document.createElement('div');
+        row.className = 'flex justify-between gap-2';
+        row.innerHTML = `
+      <span class="text-gray-300 truncate">${escHtml(p.nombre)} x${cantidad}</span>
+      <span class="font-semibold text-white flex-shrink-0">${formatPrice(sub)}</span>
+    `;
+        summaryDiv.appendChild(row);
+      });
+
+      document.getElementById('order-total').textContent = formatPrice(total);
+      document.getElementById('order-error').classList.add('hidden');
+      document.getElementById('order-form').reset();
+
+      const overlay = document.getElementById('order-overlay');
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+    }
+
+    function closeOrderModal() {
+      const overlay = document.getElementById('order-overlay');
+      overlay.classList.add('hidden');
+      overlay.classList.remove('flex');
+    }
+
+    function closeSuccessModal() {
+      const overlay = document.getElementById('success-overlay');
+      overlay.classList.add('hidden');
+      overlay.classList.remove('flex');
+      cart = [];
+      updateCartUI();
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // ORDER SUBMISSION  →  Supabase
+    // ══════════════════════════════════════════════════════════════════════════
+    async function submitOrder(event) {
+      event.preventDefault();
+
+      const nombre = document.getElementById('input-nombre').value.trim();
+      const telefono = document.getElementById('input-telefono').value.trim();
+      const errDiv = document.getElementById('order-error');
+      const spinner = document.getElementById('submit-spinner');
+      const submitBtn = document.getElementById('btn-submit-order');
+      const submitTxt = document.getElementById('submit-text');
+
+      errDiv.classList.add('hidden');
+
+      if (!nombre) { showOrderError('Por favor ingresa el nombre del cliente.'); return; }
+      if (!telefono) { showOrderError('Por favor ingresa el número de teléfono.'); return; }
+      if (cart.length === 0) { showOrderError('El carrito está vacío.'); return; }
+
+      // Loading state
+      submitBtn.disabled = true;
+      spinner.classList.remove('hidden');
+      submitTxt.textContent = 'Procesando…';
+
+      try {
+        // 1. Insert into pedidos
+        const { data: pedidoData, error: pedidoError } = await db
+          .from('pedidos')
+          .insert({
+            nombre_cliente: nombre,
+            nro_tlf: telefono,
+            status: 1
+          })
+          .select('id_pedido')
+          .single();
+
+        if (pedidoError) throw pedidoError;
+
+        const id_pedido = pedidoData.id_pedido;
+
+        // 2. Build renglones
+        const renglones = cart.map(({ product: p, cantidad }) => ({
+          id_pedido,
+          id_articulo: p.id_art,
+          cantidad,
+          precio: p.precio
+        }));
+
+        // 3. Insert renglones
+        const { error: renglonesError } = await db
+          .from('pedidos_renglones')
+          .insert(renglones);
+
+        if (renglonesError) throw renglonesError;
+
+        // 4. Success
+        closeOrderModal();
+        showSuccessModal(nombre, telefono, id_pedido);
+
+      } catch (err) {
+        console.error('Error al guardar pedido:', err);
+        showOrderError(`Error al procesar el pedido: ${err.message ?? 'Inténtalo de nuevo.'}`);
+      } finally {
+        submitBtn.disabled = false;
+        spinner.classList.add('hidden');
+        submitTxt.textContent = '✅ Confirmar Pedido';
+      }
+    }
+
+    function showSuccessModal(nombre, telefono, id_pedido) {
+      const detail = document.getElementById('success-detail');
+      detail.innerHTML = `
+    <div class="flex justify-between"><span class="text-gray-400">Pedido #</span><span class="font-bold">${id_pedido}</span></div>
+    <div class="flex justify-between"><span class="text-gray-400">Cliente</span><span class="font-semibold">${escHtml(nombre)}</span></div>
+    <div class="flex justify-between"><span class="text-gray-400">Teléfono</span><span class="font-semibold">${escHtml(telefono)}</span></div>
+    <div class="flex justify-between"><span class="text-gray-400">Artículos</span><span class="font-semibold">${cart.length}</span></div>
+  `;
+      const overlay = document.getElementById('success-overlay');
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // UI UTILS
+    // ══════════════════════════════════════════════════════════════════════════
+    function showProductSkeleton(show) {
+      document.getElementById('products-skeleton').classList.toggle('hidden', !show);
+      document.getElementById('products-grid').classList.toggle('hidden', show);
+    }
+
+    function showError(msg) {
+      const errEl = document.getElementById('error-msg');
+      document.getElementById('error-text').textContent = msg;
+      errEl.classList.remove('hidden');
+    }
+
+    function showOrderError(msg) {
+      const errDiv = document.getElementById('order-error');
+      errDiv.textContent = msg;
+      errDiv.classList.remove('hidden');
+    }
+
+    let toastTimer;
+    function showToast(msg, type = 'info') {
+      const toast = document.getElementById('toast');
+      toast.innerHTML = msg;
+      toast.classList.remove('hidden');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.add('hidden'), 2800);
+    }
+
+    function formatPrice(value) {
+      return new Intl.NumberFormat('es-VE', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2
+      }).format(value);
+    }
+
+    function escHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+  </script>
+
+</body>
+
+</html>
