@@ -354,7 +354,7 @@
   </aside>
 
   <!-- ════════════════════════════════════════════
-     ORDER MODAL  (nombre + teléfono)
+     ORDER MODAL  (nombre + teléfono + comentario)
 ════════════════════════════════════════════ -->
   <div id="order-overlay"
     class="fixed inset-0 bg-black/70 z-[60] hidden backdrop-blur-sm flex items-center justify-center p-4">
@@ -369,6 +369,12 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
+      </div>
+
+      <!-- Bienvenida de regreso (se muestra si el cliente ya existe) -->
+      <div id="returning-client-banner" class="hidden mx-6 mt-4 bg-brand-950/60 border border-brand-700/50 rounded-xl px-4 py-2.5 flex items-center gap-2 text-sm">
+        <span class="text-xl">👋</span>
+        <span class="text-brand-300 font-medium">¡Bienvenido de vuelta! Tus datos fueron pre-cargados.</span>
       </div>
 
       <!-- Order summary -->
@@ -403,6 +409,17 @@
           <input id="input-telefono" type="tel" placeholder="Ej: 0414-1234567" required autocomplete="tel" class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-sm
                       focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent
                       placeholder-gray-500 transition-all duration-200" />
+        </div>
+
+        <!-- Comentario (opcional) -->
+        <div>
+          <label for="input-comentario" class="block text-sm font-medium text-gray-300 mb-1">
+            💬 Comentario <span class="text-gray-500 text-xs font-normal">(opcional)</span>
+          </label>
+          <textarea id="input-comentario" rows="2" placeholder="Ej: Sin sal, entregar en la tarde, apartamento 3B…"
+            class="w-full bg-gray-900 border border-gray-700 rounded-xl px-4 py-3 text-sm resize-none
+                      focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent
+                      placeholder-gray-500 transition-all duration-200"></textarea>
         </div>
 
         <!-- Error order -->
@@ -475,18 +492,32 @@
 
     // ── Session Tracking State ─────────────────────────────────────────────────
     let currentSessionId = '';
+    let savedClientData = null; // { nombre_cliente, nro_tlf } del cliente si ya hizo pedidos antes
 
-    function initSession() {
-      // Buscar si ya existe un id_session en el navegador
+    async function initSession() {
+      // 1. Buscar si ya existe un id_session en el navegador
       currentSessionId = localStorage.getItem('bodeguita_session_id');
       if (!currentSessionId) {
         // Generar uno nuevo único (ej: timestamp + random)
-        currentSessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36.25).substr(2, 9);
+        currentSessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         localStorage.setItem('bodeguita_session_id', currentSessionId);
       }
 
-      // Opcional: Registrar la visita en Supabase de forma silenciosa
+      // 2. Cargar datos del cliente guardados en localStorage (nombre y teléfono)
+      const localNombre = localStorage.getItem('bodeguita_client_nombre');
+      const localTelefono = localStorage.getItem('bodeguita_client_telefono');
+      if (localNombre || localTelefono) {
+        savedClientData = {
+          nombre_cliente: localNombre || '',
+          nro_tlf: localTelefono || ''
+        };
+      }
+
+      // 3. Registrar visita de auditoría
       logVisita(currentSessionId);
+
+      // 4. Si faltan datos en localStorage, consultar la base de datos (último pedido con este id_session)
+      await loadClientSession(currentSessionId);
     }
 
     async function logVisita(sessionId) {
@@ -501,13 +532,57 @@
       }
     }
 
+    // Carga los datos del cliente (nombre + teléfono) si ya hizo un pedido desde esta sesión
+    async function loadClientSession(sessionId) {
+      // Si ya los tenemos cargados desde localStorage, no es necesario hacer petición a la BD
+      if (savedClientData && savedClientData.nombre_cliente && savedClientData.nro_tlf) {
+        return;
+      }
+
+      try {
+        // Buscamos el último pedido registrado con este id_session en la tabla pedidos
+        const { data, error } = await db
+          .from('pedidos')
+          .select('nombre_cliente, nro_tlf')
+          .eq('id_session', sessionId)
+          .order('id_pedido', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!error && data && (data.nombre_cliente || data.nro_tlf)) {
+          savedClientData = {
+            nombre_cliente: data.nombre_cliente || '',
+            nro_tlf: data.nro_tlf || ''
+          };
+          if (data.nombre_cliente) localStorage.setItem('bodeguita_client_nombre', data.nombre_cliente);
+          if (data.nro_tlf) localStorage.setItem('bodeguita_client_telefono', data.nro_tlf);
+        }
+      } catch (e) {
+        console.warn('No se pudo cargar datos del cliente:', e);
+      }
+    }
+
+    // Guarda o actualiza el nombre y teléfono del cliente para esta sesión
+    async function saveClientSession(nombre, telefono) {
+      try {
+        // Persistir en localStorage igual que el id_session
+        localStorage.setItem('bodeguita_client_nombre', nombre);
+        localStorage.setItem('bodeguita_client_telefono', telefono);
+
+        // Actualizar caché en memoria
+        savedClientData = { nombre_cliente: nombre, nro_tlf: telefono };
+      } catch (e) {
+        console.warn('No se pudo guardar datos del cliente en localStorage:', e);
+      }
+    }
+
 
 
 
 
     // ── Bootstrap ──────────────────────────────────────────────────────────────
     document.addEventListener('DOMContentLoaded', async () => {
-      initSession(); // <--- Inicializar la sesión y trazabilidad aquí
+      await initSession(); // esperar a que cargue el cliente guardado antes de continuar
       await Promise.all([loadClassifications(), loadProducts()]);
     });
 
@@ -892,6 +967,16 @@
       document.getElementById('order-error').classList.add('hidden');
       document.getElementById('order-form').reset();
 
+      // Pre-llenar datos si el cliente ya hizo un pedido antes desde esta sesión
+      const banner = document.getElementById('returning-client-banner');
+      if (savedClientData && (savedClientData.nombre_cliente || savedClientData.nro_tlf)) {
+        document.getElementById('input-nombre').value = savedClientData.nombre_cliente || '';
+        document.getElementById('input-telefono').value = savedClientData.nro_tlf || '';
+        banner.classList.remove('hidden');
+      } else {
+        banner.classList.add('hidden');
+      }
+
       const overlay = document.getElementById('order-overlay');
       overlay.classList.remove('hidden');
       overlay.classList.add('flex');
@@ -907,6 +992,8 @@
       const overlay = document.getElementById('success-overlay');
       overlay.classList.add('hidden');
       overlay.classList.remove('flex');
+      // El carrito ya fue vaciado al procesar el pedido;
+      // esta llamada es por si acaso el usuario cierra sin haber hecho otro pedido
       cart = [];
       updateCartUI();
     }
@@ -919,6 +1006,7 @@
 
       const nombre = document.getElementById('input-nombre').value.trim();
       const telefono = document.getElementById('input-telefono').value.trim();
+      const comentario = document.getElementById('input-comentario').value.trim();
       const errDiv = document.getElementById('order-error');
       const spinner = document.getElementById('submit-spinner');
       const submitBtn = document.getElementById('btn-submit-order');
@@ -936,16 +1024,18 @@
       submitTxt.textContent = 'Procesando…';
 
       try {
-        // 1. Insert into pedidos
+        // 1. Insert into pedidos (incluye comentario)
+        const pedidoPayload = {
+          nombre_cliente: nombre,
+          nro_tlf: telefono,
+          status: 1,
+          id_session: currentSessionId
+        };
+        if (comentario) pedidoPayload.comentario = comentario;
+
         const { error: pedidoError } = await db
           .from('pedidos')
-          .insert({
-            nombre_cliente: nombre,
-            nro_tlf: telefono,
-            status: 1,
-            id_session: currentSessionId
-          });
-
+          .insert(pedidoPayload);
 
         if (pedidoError) {
           console.error('Detalle error pedido:', JSON.stringify(pedidoError));
@@ -987,9 +1077,24 @@
           throw renglonesError;
         }
 
-        // 5. Success
+        // 5. Guardar / actualizar datos del cliente para esta sesión (para pre-llenar la próxima vez)
+        await saveClientSession(nombre, telefono);
+
+        // 6. Vaciar el carrito AHORA (antes de mostrar el modal de éxito)
+        //    Guardamos la cantidad para el resumen antes de limpiar
+        const totalArticulos = cart.length;
+        cart = [];
+        updateCartUI();
+        // Resetear visualmente los botones de producto en la grilla
+        document.querySelectorAll('[id^="add-btn-"]').forEach(btn => {
+          btn.className = btn.className
+            .replace('bg-green-700 hover:bg-green-600 shadow-green-900/40', 'bg-brand-600 hover:bg-brand-500 shadow-brand-900/50');
+          btn.innerHTML = '🛒 Agregar';
+        });
+
+        // 7. Success
         closeOrderModal();
-        showSuccessModal(nombre, telefono, id_pedido);
+        showSuccessModal(nombre, telefono, id_pedido, comentario, totalArticulos);
 
       } catch (err) {
         console.error('Error al guardar pedido:', err);
@@ -1001,13 +1106,17 @@
       }
     }
 
-    function showSuccessModal(nombre, telefono, id_pedido) {
+    function showSuccessModal(nombre, telefono, id_pedido, comentario, totalArticulos) {
       const detail = document.getElementById('success-detail');
+      const comentarioRow = comentario
+        ? `<div class="flex gap-2 mt-1"><span class="text-gray-400 flex-shrink-0">Nota</span><span class="font-semibold text-right">${escHtml(comentario)}</span></div>`
+        : '';
       detail.innerHTML = `
     <div class="flex justify-between"><span class="text-gray-400">Pedido #</span><span class="font-bold">${id_pedido}</span></div>
     <div class="flex justify-between"><span class="text-gray-400">Cliente</span><span class="font-semibold">${escHtml(nombre)}</span></div>
     <div class="flex justify-between"><span class="text-gray-400">Teléfono</span><span class="font-semibold">${escHtml(telefono)}</span></div>
-    <div class="flex justify-between"><span class="text-gray-400">Artículos</span><span class="font-semibold">${cart.length}</span></div>
+    <div class="flex justify-between"><span class="text-gray-400">Artículos</span><span class="font-semibold">${totalArticulos}</span></div>
+    ${comentarioRow}
   `;
       const overlay = document.getElementById('success-overlay');
       overlay.classList.remove('hidden');
